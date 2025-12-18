@@ -25,6 +25,11 @@
    ./run.sh
    ```
 
+ * 使用 Ctrl+c 離開 docker 後，需要手動關閉 container，避免在背景中執行 Isaac sim
+   ```bash
+   docker stop isaac-sim-webrtc
+   ```
+
   ## 單獨運行容器而不執行 Isaac sim
   ```bash
   docker exec -it isaac-sim-webrtc bash
