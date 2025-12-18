@@ -27,7 +27,7 @@
 
   ## 單獨運行容器而不執行 Isaac sim
   ```bash
-  docker exec -it isaac-sim bash
+  docker exec -it isaac-sim-webrtc bash
   ```
 
 
