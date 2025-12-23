@@ -24,4 +24,5 @@ ENV TZ=Asia/Taipei
 #  && apt clean \
 #  && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /workspace
+# WORKDIR /root
+WORKDIR /root/work
