@@ -1,0 +1,34 @@
+[global_config]
+[keybindings]
+[profiles]
+  [[default]]
+    cursor_color = "#aaaaaa"
+    font = Monospace 16
+    use_system_font = False
+[layouts]
+  [[default]]
+    [[[window0]]]
+      type = Window
+      parent = ""
+    [[[child1]]]
+      type = Terminal
+      parent = window0
+  [[isaac_sim]]
+    [[[window0]]]
+      type = Window
+      parent = ""
+    [[[child1]]]
+      type = VPaned
+      parent = window0
+      ratio = 0.72
+    [[[child2]]]
+      type = Terminal
+      parent = child1
+      command = /entrypoint.sh isaac
+      profile = default
+    [[[child3]]]
+      type = Terminal
+      parent = child1
+      command = bash -lc 'echo "等上方出現 app ready 後，於主機執行 AppRun 看畫面"; echo "  cd ~/isaac_sim_ws/src/squashfs-root && ./AppRun --no-sandbox"; echo; exec bash -l'
+      profile = default
+[plugins]
