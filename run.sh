@@ -16,29 +16,64 @@ allow_x11() {
   fi
 }
 
-MODE="${1:-terminator}"
-if [[ "${1:-}" == "--isaac" ]] || [[ "${1:-}" == "--here" ]]; then
-  MODE="isaac"
-fi
+docker_common() {
+  docker run --rm -it \
+    --name "${CONTAINER_NAME}" \
+    --gpus all \
+    --network host \
+    --init \
+    --shm-size=8g \
+    --ulimit memlock=-1 \
+    --ulimit stack=67108864 \
+    -e ACCEPT_EULA=Y \
+    -e PRIVACY_CONSENT=Y \
+    -e OMNI_ENV_PRIVACY_CONSENT=Y \
+    -e OMNI_KIT_ALLOW_ROOT=1 \
+    -e DISPLAY="${DISPLAY:-:0}" \
+    -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+    -v "${LOCAL_SRC}:/root/work/src" \
+    "${IMAGE_NAME}"
+}
 
 allow_x11
 
-echo "[run.sh] 啟動模式: ${MODE}（Terminator 版面: 上 Isaac Sim / 下 Shell）"
+case "${1:-}" in
+  --isaac|--here)
+    echo "[run.sh] 直接啟動 Isaac Sim（不開 Terminator）"
+    docker run --rm -it \
+      --name "${CONTAINER_NAME}" \
+      --gpus all \
+      --network host \
+      --init \
+      --shm-size=8g \
+      --ulimit memlock=-1 \
+      --ulimit stack=67108864 \
+      -e ACCEPT_EULA=Y \
+      -e PRIVACY_CONSENT=Y \
+      -e OMNI_ENV_PRIVACY_CONSENT=Y \
+      -e OMNI_KIT_ALLOW_ROOT=1 \
+      -v "${LOCAL_SRC}:/root/work/src" \
+      --entrypoint /entrypoint.sh \
+      "${IMAGE_NAME}" isaac
+    ;;
+  -h|--help)
+    cat <<EOF
+用法:
+  ./run.sh              開啟 Terminator 並自動啟動 Isaac Sim（上: Isaac / 下: Shell）
+  ./run.sh --isaac      不開 Terminator，直接 headless 啟動 Isaac Sim
 
-docker run --rm -it \
-  --name "${CONTAINER_NAME}" \
-  --gpus all \
-  --network host \
-  --init \
-  --shm-size=8g \
-  --ulimit memlock=-1 \
-  --ulimit stack=67108864 \
-  -e ACCEPT_EULA=Y \
-  -e PRIVACY_CONSENT=Y \
-  -e OMNI_ENV_PRIVACY_CONSENT=Y \
-  -e OMNI_KIT_ALLOW_ROOT=1 \
-  -e DISPLAY="${DISPLAY:-:0}" \
-  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
-  -v "${LOCAL_SRC}:/root/work/src" \
-  "${IMAGE_NAME}" \
-  "${MODE}"
+Terminator 下方 Shell 也可手動執行:
+  start-isaac
+
+看 3D 畫面（主機）:
+  cd ~/isaac_sim_ws/src/squashfs-root && ./AppRun --no-sandbox
+
+首次請先: ./build.sh
+主機請先: xhost +local:docker
+EOF
+    ;;
+  *)
+    echo "[run.sh] 啟動 Terminator 並自動執行 start-isaac"
+    docker_common
+    ;;
+esac
