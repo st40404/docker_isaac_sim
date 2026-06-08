@@ -2,21 +2,24 @@
 set -e
 
 IMAGE_NAME=isaac-sim-5.1.0-tools
-CONTAINER_NAME=isaac-sim-webrtc
+# 若自訂 image 仍有問題，可改回官方 image：
+# IMAGE_NAME=nvcr.io/nvidia/isaac-sim:5.1.0
 
-# 這裡請確認路徑正確
-# 我們掛載整個 description 資料夾，這樣內部的 mesh (stl/dae) 才能被找到
+CONTAINER_NAME=isaac-sim-webrtc
 LOCAL_SRC="/home/ron/isaac_sim_ws/src"
 
 docker run --rm -it \
   --name ${CONTAINER_NAME} \
-  --user root \
   --gpus all \
   --network host \
-  --ipc host \
   --init \
+  --shm-size=8g \
+  --ulimit memlock=-1 \
+  --ulimit stack=67108864 \
   -e ACCEPT_EULA=Y \
   -e PRIVACY_CONSENT=Y \
+  -e OMNI_ENV_PRIVACY_CONSENT=Y \
+  -e OMNI_KIT_ALLOW_ROOT=1 \
   -v ${LOCAL_SRC}:/root/work/src \
-  ${IMAGE_NAME}
-  # ./python.sh /root/scripts/load_robot.py
+  ${IMAGE_NAME} \
+  --/renderer/active=Storm
