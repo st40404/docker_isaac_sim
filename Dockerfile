@@ -50,6 +50,14 @@ RUN apt update \
  && apt clean \
  && rm -rf /var/lib/apt/lists/*
 
+# xacro 展開（convert_xacro_to_usd.sh 使用 python3，不需啟動 Isaac Sim）
+RUN apt update \
+ && apt install -y --no-install-recommends \
+    python3-pip \
+ && python3 -m pip install --no-cache-dir --break-system-packages xacro \
+ && apt clean \
+ && rm -rf /var/lib/apt/lists/*
+
 ############################## USER CONFIG ####################################
 WORKDIR /root
 
