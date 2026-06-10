@@ -58,6 +58,40 @@ RUN apt update \
  && apt clean \
  && rm -rf /var/lib/apt/lists/*
 
+############################### ISAAC LAB #####################################
+# Isaac Lab v2.3.x 對應 Isaac Sim 5.1；安裝流程參考官方 docker/Dockerfile.base
+SHELL ["/bin/bash", "-c"]
+ARG ISAAC_LAB_VERSION=v2.3.2
+ENV ISAACSIM_ROOT_PATH=/isaac-sim
+ENV ISAACLAB_PATH=/root/work/IsaacLab
+ENV TERM=xterm
+
+RUN apt update \
+ && apt install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    libglib2.0-0 \
+ && apt clean \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch "${ISAAC_LAB_VERSION}" \
+    https://github.com/isaac-sim/IsaacLab.git "${ISAACLAB_PATH}" \
+ && chmod +x "${ISAACLAB_PATH}/isaaclab.sh" \
+ && ln -sf "${ISAACSIM_ROOT_PATH}" "${ISAACLAB_PATH}/_isaac_sim"
+
+RUN "${ISAACSIM_ROOT_PATH}/python.sh" -m pip install toml
+
+RUN "${ISAACSIM_ROOT_PATH}/python.sh" "${ISAACLAB_PATH}/tools/install_deps.py" apt "${ISAACLAB_PATH}/source" \
+ && apt -y autoremove \
+ && apt clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# flatdict 在 pip build isolation 下會因缺少 pkg_resources 失敗，需先預裝
+RUN "${ISAACSIM_ROOT_PATH}/python.sh" -m pip install --no-build-isolation flatdict==4.0.1
+
+RUN TERM=xterm "${ISAACLAB_PATH}/isaaclab.sh" --install \
+ && "${ISAACSIM_ROOT_PATH}/python.sh" -m pip uninstall -y quadprog
+
 ############################## USER CONFIG ####################################
 WORKDIR /root
 
@@ -128,6 +162,16 @@ alias start-isaac="/entrypoint.sh isaac"
 alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
+
+# --- Isaac Lab ---
+export ISAACSIM_PATH=/isaac-sim
+export ISAACSIM_PYTHON_EXE=/isaac-sim/python.sh
+export ISAACLAB_PATH=/root/work/IsaacLab
+alias isaaclab="\${ISAACLAB_PATH}/isaaclab.sh"
+alias python="\${ISAACLAB_PATH}/_isaac_sim/python.sh"
+alias python3="\${ISAACLAB_PATH}/_isaac_sim/python.sh"
+alias pip="\${ISAACLAB_PATH}/_isaac_sim/python.sh -m pip"
+alias pip3="\${ISAACLAB_PATH}/_isaac_sim/python.sh -m pip"
 EOF
 
 WORKDIR /root/work

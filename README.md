@@ -1,4 +1,7 @@
 # 該 docker 環境是基於 Isaac sim 的 container 來進行封裝的
+  ## Isaac sim 5.1 環境建議
+  * driver verison 580.159.03
+  * IsaacLab version V2.3.2
 
   ## 包裝 Isaac sim
  * Step1: 下載 Isaac Sim Docker 映像檔到 Local 端的 Container 中
@@ -23,6 +26,19 @@
  * Step4: 執行 Isaac sim
    ```bash
    ./run.sh
+   ```
+
+ ## Isaac Lab（已內建於映像檔）
+ * 版本：`v2.3.2`（對應 Isaac Sim 5.1）
+ * 容器內路徑：`/root/work/IsaacLab`
+ * 驗證安裝（在容器 Shell 內）：
+   ```bash
+   /root/work/src/docker/verify_isaac_lab.sh
+   ```
+ * 快速測試 RL 訓練（headless）：
+   ```bash
+   cd /root/work/IsaacLab
+   ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ant-v0 --headless
    ```
 
  * 使用 Ctrl+c 離開 docker 後，需要手動關閉 container，避免在背景中執行 Isaac sim
