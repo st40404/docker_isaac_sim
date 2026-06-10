@@ -40,6 +40,135 @@
    cd /root/work/IsaacLab
    ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ant-v0 --headless
    ```
+ * 訓練 log 路徑：`/root/work/IsaacLab/logs/rsl_rl/ant/<時間戳>/`（內含 `model_*.pt`）
+ * 建議訓練完備份到掛載目錄，避免容器刪除後 checkpoint 消失：
+   ```bash
+   cp -r /root/work/IsaacLab/logs/rsl_rl/ant /root/work/src/rl_logs_ant
+   ```
+
+ ## 測試 Ant 訓練結果（play.py）
+
+ 使用 `play.py` 載入 checkpoint 做推論。**不需**先執行 `start-isaac`；也**不要**與 `start-isaac` 同時跑（會搶 GPU／埠）。
+
+ 確認 checkpoint 存在：
+ ```bash
+ cd /root/work/IsaacLab
+ ls -lt logs/rsl_rl/ant/
+ ls -lh logs/rsl_rl/ant/<你的run資料夾>/
+ ```
+
+ **checkpoint 參數說明**：`--checkpoint` 需傳**完整路徑**（或相對於目前目錄的可讀路徑），不能只寫 `model_999.pt`。指定某次訓練時，通常只需 `--load_run <資料夾名>`，會自動載入該 run 內最新的 `model_*.pt`。
+
+ * 快速測試（自動載入最新 checkpoint，X11 視窗）：
+   ```bash
+   cd /root/work/IsaacLab
+   ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
+     --task=Isaac-Ant-v0 \
+     --num_envs 4
+   ```
+   主機需先執行 `xhost +local:docker`。
+
+ ### 方法一：WebRTC 即時觀看（推薦）
+
+ **重要**：`AppRun` 只會開啟 Client 視窗，**不會自動有畫面**；須等容器內 `play.py` 啟動完成後，在 Client 輸入 `127.0.0.1` 並按 **Connect**。
+
+ **不要**與 `start-isaac` 同時執行（會搶 TCP 49100 / UDP 47998）。若用 `./run.sh` 開 Terminator，請先在上方面板 `Ctrl+C` 停掉 `start-isaac`。
+
+ 步驟：
+
+ 1. 容器內先跑 play（等出現 `Completed setting up the environment` 與 `Loading model checkpoint` 後再連線）：
+    ```bash
+    cd /root/work/IsaacLab
+    ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
+      --task=Isaac-Ant-v0 \
+      --livestream 1 \
+      --num_envs 4 \
+      --load_run <你的run資料夾>
+    ```
+ 2. 主機開 WebRTC Client（見下方「在 local 端安裝 Isaac Sim WebRTC Streaming Client」）：
+    ```bash
+    cd ~/isaac_sim_ws/src/squashfs-root
+    ./AppRun --no-sandbox
+    ```
+ 3. Client 中 Server 填 `127.0.0.1`（`run.sh` 使用 `--network host`），按 **Connect**，等待數秒至數十秒。
+ 4. 若連上但黑畫面，在 Client 選單 **View → Reload**。
+
+ 不指定 run 時會自動載入最新 checkpoint：
+ ```bash
+ ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
+   --task=Isaac-Ant-v0 \
+   --livestream 1 \
+   --num_envs 4
+ ```
+
+ **WebRTC 排查**（仍無畫面時）：
+
+ * 確認 `start-isaac` 未在跑：`docker exec isaac-sim-webrtc pgrep -af runheadless`
+ * 確認埠已監聽（在主機執行）：
+   ```bash
+   ss -tulnp | grep -E '49100|47998'
+   ```
+ * 先單獨測 Client 是否正常：容器內只跑 `start-isaac`，再用 Client 連 `127.0.0.1`；若這步失敗，問題在 Client／防火牆，與 `play.py` 無關。
+ * `play.py` 的 livestream 與 `start-isaac` 使用不同啟動方式；若 `start-isaac` 可連但 `play.py --livestream 1` 不行，建議改用方法二（X11）或方法三（錄影）。
+
+ ### 方法二：X11 視窗（較不穩定）
+
+ 主機先執行 `xhost +local:docker`，容器內**不加** `--headless`：
+
+ ```bash
+ cd /root/work/IsaacLab
+ ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
+   --task=Isaac-Ant-v0 \
+   --num_envs 4 \
+   --load_run <你的run資料夾>
+ ```
+
+ 可能會跳出 Isaac Sim 視窗；Docker 內 X11 轉發較不穩定，建議優先使用方法一。容器內若出現 `carb.audio` 相關警告可忽略，不影響模擬。
+
+ 指定特定 checkpoint 檔時，請用完整路徑：
+ ```bash
+ --checkpoint logs/rsl_rl/ant/<你的run資料夾>/model_999.pt
+ ```
+
+ ### 方法三：錄影後播放（最穩定）
+
+ 不會有即時畫面，結果為 mp4 檔：
+
+ ```bash
+ cd /root/work/IsaacLab
+ ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
+   --task=Isaac-Ant-v0 \
+   --headless \
+   --video \
+   --video_length 200 \
+   --num_envs 16 \
+   --load_run <你的run資料夾>
+ ```
+
+ 影片路徑：`logs/rsl_rl/ant/<你的run資料夾>/videos/play/rl-video-step-0.mp4`
+
+ 複製到主機掛載目錄：
+ ```bash
+ cp logs/rsl_rl/ant/<你的run資料夾>/videos/play/*.mp4 /root/work/src/
+ ```
+
+ ### 其他
+
+ * 看訓練曲線（TensorBoard）：
+   ```bash
+   cd /root/work/IsaacLab
+   ./isaaclab.sh -p -m tensorboard.main --logdir logs/rsl_rl/ant --bind_all
+   ```
+   瀏覽器開啟 `http://localhost:6006`
+ * 使用官方預訓練模型（未自行訓練時）：
+   ```bash
+   ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
+     --task=Isaac-Ant-v0 \
+     --headless \
+     --video \
+     --use_pretrained_checkpoint \
+     --num_envs 16
+   ```
 
  * 使用 Ctrl+c 離開 docker 後，需要手動關閉 container，避免在背景中執行 Isaac sim
    ```bash
