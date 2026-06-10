@@ -3,6 +3,9 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOCAL_SRC="$(cd "${SCRIPT_DIR}/.." && pwd)"
+ISAAC_LAB_LOGS="${LOCAL_SRC}/isaac-lab-logs"
+
+mkdir -p "${ISAAC_LAB_LOGS}"
 
 IMAGE_NAME=isaac-sim-5.1.0-tools
 # 若自訂 image 仍有問題，可改回官方 image：
@@ -32,6 +35,7 @@ docker_common() {
     -e DISPLAY="${DISPLAY:-:0}" \
     -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
     -v "${LOCAL_SRC}:/root/work/src" \
+    -v "${ISAAC_LAB_LOGS}:/root/work/IsaacLab/logs" \
     "${IMAGE_NAME}"
 }
 
@@ -53,6 +57,7 @@ case "${1:-}" in
       -e OMNI_ENV_PRIVACY_CONSENT=Y \
       -e OMNI_KIT_ALLOW_ROOT=1 \
       -v "${LOCAL_SRC}:/root/work/src" \
+      -v "${ISAAC_LAB_LOGS}:/root/work/IsaacLab/logs" \
       --entrypoint /entrypoint.sh \
       "${IMAGE_NAME}" isaac
     ;;

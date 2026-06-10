@@ -18,6 +18,7 @@
    mkdir -p ./docker/isaac-sim/logs
    mkdir -p ./docker/isaac-sim/data
    mkdir -p ./docker/isaac-sim/documents
+   mkdir -p ./isaac-lab-logs
    ```
  * Step3: 編譯 Dockerfile （包裝下載的 container: nvcr.io/nvidia/isaac-sim:5.1.0）
    ```bash
@@ -40,10 +41,14 @@
    cd /root/work/IsaacLab
    ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/train.py --task=Isaac-Ant-v0 --headless
    ```
- * 訓練 log 路徑：`/root/work/IsaacLab/logs/rsl_rl/ant/<時間戳>/`（內含 `model_*.pt`）
- * 建議訓練完備份到掛載目錄，避免容器刪除後 checkpoint 消失：
+ * 訓練 log 路徑（容器內）：`/root/work/IsaacLab/logs/rsl_rl/ant/<時間戳>/`（內含 `model_*.pt`）
+ * **log 已掛載到主機**（`run.sh` 自動建立）：
+   * 主機：`src/isaac-lab-logs/`
+   * 容器：`/root/work/IsaacLab/logs/`
+   * 重跑 `./run.sh` 後 checkpoint 仍保留，無需重新訓練
+ * 若先前在容器內訓練、尚未掛載時產生的 log，需手動複製一次到主機：
    ```bash
-   cp -r /root/work/IsaacLab/logs/rsl_rl/ant /root/work/src/rl_logs_ant
+   cp -r /root/work/IsaacLab/logs/rsl_rl /root/work/src/isaac-lab-logs/
    ```
 
  ## 測試 Ant 訓練結果（play.py）
