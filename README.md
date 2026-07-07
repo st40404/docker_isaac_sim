@@ -50,8 +50,69 @@
    ```bash
    cp -r /root/work/IsaacLab/logs/rsl_rl /root/work/src/isaac-lab-logs/
    ```
- 
- ## 測試 Ant 訓練結果（play.py）
+
+ ## BeyondMimic（whole_body_tracking）
+
+ 原始碼掛載在 `/root/work/src/whole_body_tracking`（與 `robot_lab` 同層）。**不建議**把 `pip install -e` 寫進 Dockerfile 的 `/root/work/src/...`（會被 volume 蓋掉）。
+
+ ### 自動安裝（entrypoint）
+
+ `./run.sh` 啟動容器時，`entrypoint.sh` 會呼叫 `docker/setup_beyondmimic.sh`（冪等）：
+
+ * 若存在 `whole_body_tracking` → `isaaclab.sh -p -m pip install -e ...`
+ * 若缺少 `unitree_description` → 自動下載官方 G1 資產
+
+ 略過自動安裝：
+
+ ```bash
+ SKIP_BEYONDMIMIC_SETUP=1 ./run.sh
+ ```
+
+ ### 手動安裝 / 重裝
+
+ 容器內（或 `docker exec` 進入後）：
+
+ ```bash
+ /root/work/src/docker/setup_beyondmimic.sh
+ ```
+
+ 強制重裝 extension、並重新下載 unitree 資產：
+
+ ```bash
+ /root/work/src/docker/setup_beyondmimic.sh --force-pip --download-unitree
+ ```
+
+ 驗證 pip（**不要用** `-c "import whole_body_tracking"`，會缺 `pxr`）：
+
+ ```bash
+ cd /root/work/IsaacLab
+ ./isaaclab.sh -p -m pip show whole_body_tracking
+ ```
+
+ 訓練範例見 `/root/work/src/whole_body_tracking/README.md`（需 WandB、`--headless`）。
+
+ ### start-isaac 出現 `libcublas` / `libcusparseLt` / `torch.Tensor` 錯誤
+
+ Isaac Lab 安裝後 PyTorch 為 **2.7.0+cu128**，需在 **kit 內建 Python 的 `sys.path`** 下找到 `site-packages/nvidia/cublas` 等 CUDA 12 函式庫。僅設 `LD_LIBRARY_PATH` 或手動 `source isaac_cuda_env.sh` 後再跑舊版 `start-isaac` 仍可能失敗。
+
+ **請改用**（`src/` 掛載內，通常不必重建映像）：
+
+ ```bash
+ start-isaac
+ # 或
+ /root/work/src/docker/start_isaac.sh
+ ```
+
+ `start-isaac` 為 `/usr/local/bin` 可執行檔（任何 shell 皆可用）；重建映像前若找不到，請直接用上面第二行路徑。
+
+ `isaac_cuda_env.sh` 會：
+ 1. source `setup_python_env.sh`
+ 2. 將 `omni.isaac.ml_archive` 的 CUDA 12 函式庫 symlink 到 `site-packages/nvidia/`
+ 3. 設定 `LD_LIBRARY_PATH`（含 `cusparselt` 等）
+
+ 重建映像後 `start-isaac` alias 與 Terminator 會自動呼叫 `start_isaac.sh`。
+
+  ## 測試 Ant 訓練結果（play.py）
 
  使用 `play.py` 載入 checkpoint 做推論。**不需**先執行 `start-isaac`；也**不要**與 `start-isaac` 同時跑（會搶 GPU／埠）。
 
@@ -170,6 +231,8 @@
   ## 單獨運行容器而不執行 Isaac sim
   ```bash
   docker exec -it isaac-sim-webrtc bash
+  # docker exec 不會走 entrypoint，首次請手動：
+  /root/work/src/docker/setup_beyondmimic.sh
   ```
 
 

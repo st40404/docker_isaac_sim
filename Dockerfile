@@ -18,6 +18,16 @@ RUN ln -snf /usr/share/zoneinfo/"${TZ}" /etc/localtime \
  && echo "${TZ}" > /etc/timezone
 
 COPY --chmod=0755 ./${ENTRYPOINT_FILE} /entrypoint.sh
+COPY --chmod=0755 ./start_isaac.sh /usr/local/share/isaac-sim-tools/start_isaac.sh
+COPY --chmod=0755 ./isaac_cuda_env.sh /usr/local/share/isaac-sim-tools/isaac_cuda_env.sh
+RUN cat << 'EOF' > /usr/local/bin/start-isaac && chmod +x /usr/local/bin/start-isaac
+#!/usr/bin/env bash
+script=/root/work/src/docker/start_isaac.sh
+if [[ ! -x "${script}" ]]; then
+  script=/usr/local/share/isaac-sim-tools/start_isaac.sh
+fi
+exec "${script}" "$@"
+EOF
 
 ############################### INSTALL #######################################
 RUN apt update \
@@ -92,6 +102,18 @@ RUN "${ISAACSIM_ROOT_PATH}/python.sh" -m pip install --no-build-isolation flatdi
 RUN TERM=xterm "${ISAACLAB_PATH}/isaaclab.sh" --install \
  && "${ISAACSIM_ROOT_PATH}/python.sh" -m pip uninstall -y quadprog
 
+# torch 2.7+cu128 expects CUDA 12 libs under site-packages/nvidia/{cublas,cuda_runtime,...}
+RUN ISAAC="${ISAACSIM_ROOT_PATH}" && \
+    SITE="${ISAAC}/kit/python/lib/python3.11/site-packages/nvidia" && \
+    ML="${ISAAC}/exts/omni.isaac.ml_archive/pip_prebundle/nvidia" && \
+    mkdir -p "${SITE}" && \
+    for pkg in "${ML}"/*; do \
+      name="$(basename "${pkg}")"; \
+      [ "${name}" = "__init__.py" ] && continue; \
+      [ -d "${pkg}" ] || continue; \
+      [ -e "${SITE}/${name}" ] || ln -sfn "${pkg}" "${SITE}/${name}"; \
+    done
+
 ############################## USER CONFIG ####################################
 WORKDIR /root
 
@@ -126,7 +148,7 @@ RUN mkdir -p /root/.config/terminator && \
     [[[child2]]]
       type = Terminal
       parent = child1
-      command = /entrypoint.sh isaac
+      command = /root/work/src/docker/start_isaac.sh
       profile = default
     [[[child3]]]
       type = Terminal
@@ -158,10 +180,15 @@ if [ -f /etc/bash_completion ]; then
     . /etc/bash_completion
 fi
 
-alias start-isaac="/entrypoint.sh isaac"
+alias start-isaac="/root/work/src/docker/start_isaac.sh"
 alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
+
+# --- Isaac Sim CUDA libs (torch 2.7.x after Isaac Lab install) ---
+if [[ -f /root/work/src/docker/isaac_cuda_env.sh ]]; then
+  source /root/work/src/docker/isaac_cuda_env.sh
+fi
 
 # --- Isaac Lab ---
 export ISAACSIM_PATH=/isaac-sim
