@@ -82,6 +82,18 @@
  /root/work/src/docker/setup_beyondmimic.sh --force-pip --download-unitree
  ```
 
+ ### Isaac Lab 2.3.x 相容（BeyondMimic 官方為 2.1）
+
+ 本映像為 **Isaac Sim 5.1 + Isaac Lab 2.3.2**（RTX 50 系列需 Sim 5.1）。`whole_body_tracking` 已做最小修補：
+
+ * `scripts/rsl_rl/train.py`：移除 Isaac Lab 2.3 已刪除的 `dump_pickle`，僅保留 `dump_yaml`
+
+ 驗證安裝與任務註冊（約 1 分鐘，會啟動 headless Sim）：
+
+ ```bash
+ /root/work/src/docker/verify_beyondmimic.sh
+ ```
+
  驗證 pip（**不要用** `-c "import whole_body_tracking"`，會缺 `pxr`）：
 
  ```bash
@@ -89,7 +101,7 @@
  ./isaaclab.sh -p -m pip show whole_body_tracking
  ```
 
- 訓練範例見 `/root/work/src/whole_body_tracking/README.md`（需 WandB、`--headless`）。
+ 訓練範例見 `/root/work/src/whole_body_tracking/README.md`（需 WandB motion registry、`--headless`）。
 
  ### start-isaac 出現 `libcublas` / `libcusparseLt` / `torch.Tensor` 錯誤
 
