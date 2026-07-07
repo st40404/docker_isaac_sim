@@ -102,6 +102,16 @@ RUN "${ISAACSIM_ROOT_PATH}/python.sh" -m pip install --no-build-isolation flatdi
 RUN TERM=xterm "${ISAACLAB_PATH}/isaaclab.sh" --install \
  && "${ISAACSIM_ROOT_PATH}/python.sh" -m pip uninstall -y quadprog
 
+# HuggingFace CLI (for downloading motion CSVs from HF datasets)
+# Install into Isaac Lab's python env so it works with `./isaaclab.sh -p ...`
+RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U huggingface_hub
+RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U wandb
+RUN cat <<'EOF' > /usr/local/bin/huggingface-cli && chmod +x /usr/local/bin/huggingface-cli
+#!/usr/bin/env bash
+set -euo pipefail
+exec /root/work/IsaacLab/_isaac_sim/python.sh -m huggingface_hub.cli.hf "$@"
+EOF
+
 # torch 2.7+cu128 expects CUDA 12 libs under site-packages/nvidia/{cublas,cuda_runtime,...}
 RUN ISAAC="${ISAACSIM_ROOT_PATH}" && \
     SITE="${ISAAC}/kit/python/lib/python3.11/site-packages/nvidia" && \
