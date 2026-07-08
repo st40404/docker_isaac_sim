@@ -8,6 +8,10 @@ ENV TZ=Asia/Taipei
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=all
 
+# WandB defaults for BeyondMimic (csv_to_npz / train / replay)
+ENV WANDB_MODE=online
+ENV WANDB_ENTITY=lung40404-graphen
+
 USER root
 
 # 台灣 apt 鏡像
