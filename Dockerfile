@@ -38,6 +38,7 @@ RUN apt update \
  && apt install -y --no-install-recommends \
     sudo \
     git \
+    git-lfs \
     htop \
     wget \
     curl \
@@ -53,6 +54,7 @@ RUN apt update \
     bash-completion \
     iputils-ping \
     net-tools \
+ && git lfs install \
  && apt clean \
  && rm -rf /var/lib/apt/lists/*
 
