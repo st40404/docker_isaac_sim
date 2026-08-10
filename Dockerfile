@@ -112,10 +112,16 @@ RUN TERM=xterm "${ISAACLAB_PATH}/isaaclab.sh" --install \
 # Install into Isaac Lab's python env so it works with `./isaaclab.sh -p ...`
 RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U huggingface_hub
 RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U wandb
+RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U tensorboard
 RUN cat <<'EOF' > /usr/local/bin/huggingface-cli && chmod +x /usr/local/bin/huggingface-cli
 #!/usr/bin/env bash
 set -euo pipefail
 exec /root/work/IsaacLab/_isaac_sim/python.sh -m huggingface_hub.cli.hf "$@"
+EOF
+RUN cat <<'EOF' > /usr/local/bin/tensorboard && chmod +x /usr/local/bin/tensorboard
+#!/usr/bin/env bash
+set -euo pipefail
+exec /root/work/IsaacLab/_isaac_sim/python.sh -m tensorboard.main "$@"
 EOF
 
 # torch 2.7+cu128 expects CUDA 12 libs under site-packages/nvidia/{cublas,cuda_runtime,...}

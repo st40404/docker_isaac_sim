@@ -219,12 +219,19 @@
 
  ### 其他
 
- * 看訓練曲線（TensorBoard）：
+ * 看訓練曲線（TensorBoard；映像已預裝）：
    ```bash
-   cd /root/work/IsaacLab
-   ./isaaclab.sh -p -m tensorboard.main --logdir logs/rsl_rl/ant --bind_all
+   # 容器內（run.sh 使用 --network host，主機可直接開瀏覽器）
+   tensorboard --logdir /root/work/IsaacLab/logs/rsl_rl/ptlt_flat --bind_all
+   # 或
+   ./isaaclab.sh -p -m tensorboard.main --logdir logs/rsl_rl/ptlt_flat --bind_all
    ```
    瀏覽器開啟 `http://localhost:6006`
+
+   尚未重建映像時，可先在執行中的容器臨時安裝：
+   ```bash
+   /root/work/IsaacLab/_isaac_sim/python.sh -m pip install -U tensorboard
+   ```
  * 使用官方預訓練模型（未自行訓練時）：
    ```bash
    ./isaaclab.sh -p scripts/reinforcement_learning/rsl_rl/play.py \
