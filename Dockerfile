@@ -14,6 +14,14 @@ ENV WANDB_ENTITY=lung40404-graphen
 
 USER root
 
+# omni.services.pip_archive 的 idna/*.py 連到 omni.kit.pip_archive，官方映像缺少目標，
+# import idna 會 FileNotFoundError（Onshape、cache indicator、CAD convert、profiler）。
+RUN TARGET="/isaac-sim/extscache/omni.kit.pip_archive-0.0.0+69cbf6ad.lx64.cp311/pip_prebundle/idna" \
+ && SRC="/isaac-sim/kit/python/lib/python3.11/site-packages/idna" \
+ && mkdir -p "$(dirname "${TARGET}")" \
+ && rm -rf "${TARGET}" \
+ && cp -a "${SRC}" "${TARGET}"
+
 # 台灣 apt 鏡像
 RUN sed -i 's@archive.ubuntu.com@tw.archive.ubuntu.com@g' /etc/apt/sources.list || true
 
