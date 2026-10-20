@@ -16,11 +16,28 @@ USER root
 
 # omni.services.pip_archive 的 idna/*.py 連到 omni.kit.pip_archive，官方映像缺少目標，
 # import idna 會 FileNotFoundError（Onshape、cache indicator、CAD convert、profiler）。
-RUN TARGET="/isaac-sim/extscache/omni.kit.pip_archive-0.0.0+69cbf6ad.lx64.cp311/pip_prebundle/idna" \
- && SRC="/isaac-sim/kit/python/lib/python3.11/site-packages/idna" \
+# 基底映像的 site-packages 還沒有 idna（Isaac Lab 安裝後才會出現），改從 kit 內建的完整套件複製。
+RUN set -eu \
+ && TARGET="/isaac-sim/extscache/omni.kit.pip_archive-0.0.0+69cbf6ad.lx64.cp311/pip_prebundle/idna" \
  && mkdir -p "$(dirname "${TARGET}")" \
  && rm -rf "${TARGET}" \
- && cp -a "${SRC}" "${TARGET}"
+ && SRC="" \
+ && for candidate in \
+      /isaac-sim/kit/extscore/omni.kit.registry.nucleus/pip_requests/idna \
+      /isaac-sim/kit/python/lib/python3.11/site-packages/pip/_vendor/idna \
+    ; do \
+      resolved="$(readlink -f "${candidate}/__init__.py" 2>/dev/null || true)"; \
+      if [ -n "${resolved}" ] && [ -f "${resolved}" ]; then \
+        SRC="${candidate}"; \
+        break; \
+      fi; \
+    done \
+ && if [ -z "${SRC}" ]; then \
+      echo "no usable idna package found in base image" >&2; \
+      exit 1; \
+    fi \
+ && cp -aL "${SRC}" "${TARGET}" \
+ && test -f "${TARGET}/__init__.py"
 
 # 台灣 apt 鏡像
 RUN sed -i 's@archive.ubuntu.com@tw.archive.ubuntu.com@g' /etc/apt/sources.list || true
