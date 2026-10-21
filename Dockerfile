@@ -14,8 +14,8 @@ ENV WANDB_ENTITY=lung40404-graphen
 
 USER root
 
-# omni.services.pip_archive 的 idna/*.py 是壞掉的符號連結。Python 會直接打開這條路徑，
-# 只補連結目標仍會 FileNotFoundError。這裡把每個壞掉的 pip_prebundle/idna 換成真實檔案。
+# Python 打開的是 omni.services.pip_archive 裡的 idna。那些 .py 是壞掉的符號連結，
+# 而且上層目錄本身也是符號連結，find 不會走進去。這裡直接換成真實檔案。
 RUN set -eu \
  && SRC="" \
  && for candidate in \
@@ -32,28 +32,16 @@ RUN set -eu \
       echo "no usable idna package found in base image" >&2; \
       exit 1; \
     fi \
- && find /isaac-sim -path '*/pip_prebundle/idna/__init__.py' -type l > /tmp/idna-links \
- && found=0 \
- && while IFS= read -r link; do \
-      dir="$(dirname "${link}")"; \
-      if [ "${dir}" = "${SRC}" ] || [ ! -L "${dir}/__init__.py" ]; then \
-        continue; \
-      fi; \
-      resolved="$(readlink -f "${dir}/__init__.py" 2>/dev/null || true)"; \
-      if [ -n "${resolved}" ] && [ -f "${resolved}" ]; then \
-        continue; \
-      fi; \
+ && for dir in \
+      /isaac-sim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/idna \
+      /isaac-sim/extscache/omni.kit.pip_archive-0.0.0+69cbf6ad.lx64.cp311/pip_prebundle/idna \
+    ; do \
+      mkdir -p "$(dirname "${dir}")"; \
       rm -rf "${dir}"; \
       cp -aL "${SRC}" "${dir}"; \
       test -f "${dir}/__init__.py"; \
       test ! -L "${dir}/__init__.py"; \
-      found=1; \
-    done < /tmp/idna-links \
- && rm -f /tmp/idna-links \
- && if [ "${found}" -eq 0 ]; then \
-      echo "no dangling idna symlink found" >&2; \
-      exit 1; \
-    fi
+    done
 
 # 台灣 apt 鏡像
 RUN sed -i 's@archive.ubuntu.com@tw.archive.ubuntu.com@g' /etc/apt/sources.list || true
