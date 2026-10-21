@@ -14,34 +14,50 @@ ENV WANDB_ENTITY=lung40404-graphen
 
 USER root
 
-# Python 打開的是 omni.services.pip_archive 裡的 idna。那些 .py 是壞掉的符號連結，
-# 而且上層目錄本身也是符號連結，find 不會走進去。這裡直接換成真實檔案。
+# omni.services.pip_archive 與 nucleus 的 idna 都是壞掉的符號連結。
+# 只接受每個 .py 都能讀到的套件；否則用 kit python 安裝一份真實的 idna。
 RUN set -eu \
- && SRC="" \
- && for candidate in \
-      /isaac-sim/kit/extscore/omni.kit.registry.nucleus/pip_requests/idna \
+ && copy_real_idna() { \
+      src="$1"; dest="$2"; \
+      if [ ! -f "${src}/__init__.py" ]; then return 1; fi; \
+      rm -rf "${dest}"; \
+      mkdir -p "${dest}"; \
+      for f in "${src}"/*; do \
+        base="$(basename "${f}")"; \
+        if [ -d "${f}" ]; then continue; fi; \
+        if [ ! -f "${f}" ]; then rm -rf "${dest}"; return 1; fi; \
+        cp -L "${f}" "${dest}/${base}" || { rm -rf "${dest}"; return 1; }; \
+      done; \
+      [ -f "${dest}/__init__.py" ] && [ ! -L "${dest}/__init__.py" ] && [ -f "${dest}/core.py" ]; \
+    }; \
+    src_used=""; \
+    for src in \
       /isaac-sim/kit/python/lib/python3.11/site-packages/pip/_vendor/idna \
     ; do \
-      resolved="$(readlink -f "${candidate}/__init__.py" 2>/dev/null || true)"; \
-      if [ -n "${resolved}" ] && [ -f "${resolved}" ]; then \
-        SRC="${candidate}"; \
+      if copy_real_idna "${src}" /tmp/idna-real; then \
+        src_used="${src}"; \
         break; \
       fi; \
-    done \
- && if [ -z "${SRC}" ]; then \
-      echo "no usable idna package found in base image" >&2; \
-      exit 1; \
-    fi \
- && for dir in \
+    done; \
+    if [ -z "${src_used}" ]; then \
+      /isaac-sim/python.sh -m pip install --no-cache-dir --target /tmp/idna-pkg 'idna==3.10'; \
+      rm -rf /tmp/idna-real; \
+      cp -a /tmp/idna-pkg/idna /tmp/idna-real; \
+      src_used="pip"; \
+    fi; \
+    echo "idna source: ${src_used}"; \
+    for dir in \
       /isaac-sim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/idna \
       /isaac-sim/extscache/omni.kit.pip_archive-0.0.0+69cbf6ad.lx64.cp311/pip_prebundle/idna \
     ; do \
       mkdir -p "$(dirname "${dir}")"; \
       rm -rf "${dir}"; \
-      cp -aL "${SRC}" "${dir}"; \
+      cp -a /tmp/idna-real "${dir}"; \
       test -f "${dir}/__init__.py"; \
       test ! -L "${dir}/__init__.py"; \
-    done
+      test -f "${dir}/core.py"; \
+    done; \
+    rm -rf /tmp/idna-real /tmp/idna-pkg
 
 # 台灣 apt 鏡像
 RUN sed -i 's@archive.ubuntu.com@tw.archive.ubuntu.com@g' /etc/apt/sources.list || true
