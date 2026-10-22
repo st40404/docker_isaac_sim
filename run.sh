@@ -7,9 +7,9 @@ ISAAC_LAB_LOGS="${LOCAL_SRC}/isaac-lab-logs"
 
 mkdir -p "${ISAAC_LAB_LOGS}"
 
-IMAGE_NAME=isaac-sim-5.1.0-tools
-# 若自訂 image 仍有問題，可改回官方 image：
-# IMAGE_NAME=nvcr.io/nvidia/isaac-sim:5.1.0
+IMAGE_NAME=isaac-sim-6.2.0-tools
+# 若自訂 image 仍有問題，可改回官方 image（沒有 Isaac Lab / Terminator）：
+# IMAGE_NAME=nvcr.io/nvidia/isaac-sim:6.2.0
 
 CONTAINER_NAME=isaac-sim-webrtc
 # 第 7 張卡，nvidia-smi 編號 GPU 6。換卡時改這個數字。

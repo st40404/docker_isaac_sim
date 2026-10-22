@@ -71,8 +71,11 @@ pip_install_needed() {
   if ! "${ISAACLAB_PATH}/isaaclab.sh" -p -m pip show whole_body_tracking >/dev/null 2>&1; then
     return 0
   fi
-  "${ISAACLAB_PATH}/isaaclab.sh" -p -m pip show whole_body_tracking 2>/dev/null \
-    | grep -Fq "Editable project location: ${WBT_PKG}"
+  if "${ISAACLAB_PATH}/isaaclab.sh" -p -m pip show whole_body_tracking 2>/dev/null \
+    | grep -Fq "Editable project location: ${WBT_PKG}"; then
+    return 1
+  fi
+  return 0
 }
 
 install_extension() {

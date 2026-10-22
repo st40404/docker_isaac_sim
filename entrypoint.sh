@@ -14,7 +14,8 @@ setup_isaac_cuda_env() {
     # shellcheck disable=SC1091
     source "${ISAAC_DIR}/setup_python_env.sh"
   fi
-  local nvidia_site="${ISAAC_DIR}/kit/python/lib/python3.11/site-packages/nvidia"
+  local nvidia_site
+  nvidia_site="$(echo "${ISAAC_DIR}/kit/python/lib"/python3.*/site-packages/nvidia)"
   if [[ -d "${nvidia_site}" ]]; then
     local libdir
     for libdir in "${nvidia_site}"/*/lib; do
@@ -48,10 +49,9 @@ run_isaac() {
   setup_isaac_cuda_env
   cd "${ISAAC_DIR}"
   if [[ -x ./runheadless.sh ]]; then
-    exec ./runheadless.sh --/renderer/active=Storm "$@"
+    exec ./runheadless.sh "$@"
   fi
-  exec ./kit/kit ./apps/isaacsim.exp.full.streaming.kit --no-window \
-    --/renderer/active=Storm "$@"
+  exec ./kit/kit ./apps/isaacsim.exp.full.streaming.kit --no-window "$@"
 }
 
 case "${1:-bash}" in

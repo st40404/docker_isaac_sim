@@ -1,12 +1,14 @@
 # 該 docker 環境是基於 Isaac sim 的 container 來進行封裝的
-  ## Isaac sim 5.1 環境建議
-  * driver verison 580.159.03
-  * IsaacLab version V2.3.2
+  ## Isaac Sim 6.2 環境（驅動 595.84 / RTX PRO 6000 Blackwell）
+  * 映像：`nvcr.io/nvidia/isaac-sim:6.2.0`，建置後標籤 `isaac-sim-6.2.0-tools`
+  * Isaac Lab：`v3.0.0`（Python 3.12、PyTorch 2.11 + CUDA 13）
+  * 主機驅動維持 **595.84** 即可。Isaac Sim 5.1 在這張卡上會於 `librtx.scenedb` segfault，不要再改回 5.1
+  * 若改走驅動降級，5.1 映像需要的是 580 分支（例如 580.159.03），與本檔現況不同
 
   ## 包裝 Isaac sim
  * Step1: 下載 Isaac Sim Docker 映像檔到 Local 端的 Container 中
    ```bash
-   docker pull nvcr.io/nvidia/isaac-sim:5.1.0
+   docker pull nvcr.io/nvidia/isaac-sim:6.2.0
    ```
  * Step2: 建立掛載資料夾
    ```bash
@@ -20,7 +22,7 @@
    mkdir -p ./docker/isaac-sim/documents
    mkdir -p ./isaac-lab-logs
    ```
- * Step3: 編譯 Dockerfile （包裝下載的 container: nvcr.io/nvidia/isaac-sim:5.1.0）
+ * Step3: 編譯 Dockerfile （包裝下載的 container: nvcr.io/nvidia/isaac-sim:6.2.0）
    ```bash
    ./build.sh
    ```
@@ -30,7 +32,8 @@
    ```
 
  ## Isaac Lab（已內建於映像檔）
- * 版本：`v2.3.2`（對應 Isaac Sim 5.1）
+ * 版本：`v3.0.0`（對應 Isaac Sim 6.2）
+ * Python 在 `/opt/isaaclab-venv`（以 Kit 的 Python 3.12 建立）。請用 `./isaaclab.sh -p`，不要直接呼叫 `/isaac-sim/python.sh` 跑 Isaac Lab
  * 容器內路徑：`/root/work/IsaacLab`
  * 驗證安裝（在容器 Shell 內）：
    ```bash
@@ -82,11 +85,11 @@
  /root/work/src/docker/setup_beyondmimic.sh --force-pip --download-unitree
  ```
 
- ### Isaac Lab 2.3.x 相容（BeyondMimic 官方為 2.1）
+ ### BeyondMimic 與 Isaac Lab 3.0
 
- 本映像為 **Isaac Sim 5.1 + Isaac Lab 2.3.2**（RTX 50 系列需 Sim 5.1）。`whole_body_tracking` 已做最小修補：
+ 映像已換成 **Isaac Sim 6.2 + Isaac Lab 3.0.0**，用來在驅動 595.84 上啟動 RTX。`whole_body_tracking` 仍是 Isaac Lab 2.1 / 2.3 的 API（含先前拿掉 `dump_pickle` 的修補），**尚未移植到 Lab 3.0**。`./run.sh` 仍會嘗試 editable 安裝，但 `train.py` / `play.py` 不能直接沿用 2.3 的指令。
 
- * `scripts/rsl_rl/train.py`：移除 Isaac Lab 2.3 已刪除的 `dump_pickle`，僅保留 `dump_yaml`
+ `start-isaac` 不再強制 `--/renderer/active=Storm`。6.2 使用預設 RTX；5.1 上強制 Storm 仍會載入 `rtx.scenedb` 並在 595 驅動崩潰。
 
  驗證安裝與任務註冊（約 1 分鐘，會啟動 headless Sim）：
 
@@ -105,7 +108,7 @@
 
  ### start-isaac 出現 `libcublas` / `libcusparseLt` / `torch.Tensor` 錯誤
 
- Isaac Lab 安裝後 PyTorch 為 **2.7.0+cu128**，需在 **kit 內建 Python 的 `sys.path`** 下找到 `site-packages/nvidia/cublas` 等 CUDA 12 函式庫。僅設 `LD_LIBRARY_PATH` 或手動 `source isaac_cuda_env.sh` 後再跑舊版 `start-isaac` 仍可能失敗。
+ Isaac Lab 3.0 的 PyTorch 為 **2.11.0+cu130**，裝在 `/opt/isaaclab-venv`。建置時會把 Kit 的 pip_prebundle torch 改指向這個 venv。`isaac_cuda_env.sh` 只在 Isaac Sim 5.1 的 `omni.isaac.ml_archive` 目錄還在時，才補 CUDA 12 的 `site-packages/nvidia` 連結。
 
  **請改用**（`src/` 掛載內，通常不必重建映像）：
 

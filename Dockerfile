@@ -1,4 +1,8 @@
-FROM nvcr.io/nvidia/isaac-sim:5.1.0
+# Isaac Sim 5.1 的 RTX 堆疊在驅動 595.x + Blackwell（RTX PRO 6000）會在
+# librtx.scenedb 啟動時 segfault。6.2.0 是 Isaac Lab 3.0.0 對應的映像，可留在 595.84。
+FROM ghcr.io/astral-sh/uv:0.12.9@sha256:8b940d3a9d65bed080436972241af2e21c84b5e8c9193f7014ed71479ee795ff AS uv
+
+FROM nvcr.io/nvidia/isaac-sim:6.2.0
 
 ############################## SYSTEM PARAMETERS ##############################
 ARG ENTRYPOINT_FILE=entrypoint.sh
@@ -14,50 +18,26 @@ ENV WANDB_ENTITY=lung40404-graphen
 
 USER root
 
-# omni.services.pip_archive 與 nucleus 的 idna 都是壞掉的符號連結。
-# 只接受每個 .py 都能讀到的套件；否則用 kit python 安裝一份真實的 idna。
+# 部分 Isaac Sim pip_prebundle 把 idna 做成斷掉的符號連結。
+# 只修實際壞掉的套件；6.2 若已修好則略過，避免寫死 5.1 的 cp311 路徑。
 RUN set -eu \
- && copy_real_idna() { \
-      src="$1"; dest="$2"; \
-      if [ ! -f "${src}/__init__.py" ]; then return 1; fi; \
-      rm -rf "${dest}"; \
-      mkdir -p "${dest}"; \
-      for f in "${src}"/*; do \
-        base="$(basename "${f}")"; \
-        if [ -d "${f}" ]; then continue; fi; \
-        if [ ! -f "${f}" ]; then rm -rf "${dest}"; return 1; fi; \
-        cp -L "${f}" "${dest}/${base}" || { rm -rf "${dest}"; return 1; }; \
-      done; \
-      [ -f "${dest}/__init__.py" ] && [ ! -L "${dest}/__init__.py" ] && [ -f "${dest}/core.py" ]; \
-    }; \
-    src_used=""; \
-    for src in \
-      /isaac-sim/kit/python/lib/python3.11/site-packages/pip/_vendor/idna \
-    ; do \
-      if copy_real_idna "${src}" /tmp/idna-real; then \
-        src_used="${src}"; \
-        break; \
-      fi; \
-    done; \
-    if [ -z "${src_used}" ]; then \
+ && find /isaac-sim -path '*/idna/__init__.py' -xtype l -print > /tmp/idna-broken.txt 2>/dev/null || true \
+ && if [ ! -s /tmp/idna-broken.txt ]; then \
+      echo "idna: no broken symlinks"; \
+    else \
       /isaac-sim/python.sh -m pip install --no-cache-dir --target /tmp/idna-pkg 'idna==3.10'; \
-      rm -rf /tmp/idna-real; \
-      cp -a /tmp/idna-pkg/idna /tmp/idna-real; \
-      src_used="pip"; \
-    fi; \
-    echo "idna source: ${src_used}"; \
-    for dir in \
-      /isaac-sim/extscache/omni.services.pip_archive-0.16.0+107.0.3.lx64.cp311/pip_prebundle/idna \
-      /isaac-sim/extscache/omni.kit.pip_archive-0.0.0+69cbf6ad.lx64.cp311/pip_prebundle/idna \
-    ; do \
-      mkdir -p "$(dirname "${dir}")"; \
-      rm -rf "${dir}"; \
-      cp -a /tmp/idna-real "${dir}"; \
-      test -f "${dir}/__init__.py"; \
-      test ! -L "${dir}/__init__.py"; \
-      test -f "${dir}/core.py"; \
-    done; \
-    rm -rf /tmp/idna-real /tmp/idna-pkg
+      while IFS= read -r init; do \
+        dir="$(dirname "${init}")"; \
+        rm -rf "${dir}"; \
+        cp -a /tmp/idna-pkg/idna "${dir}"; \
+        test -f "${dir}/__init__.py"; \
+        test ! -L "${dir}/__init__.py"; \
+        test -f "${dir}/core.py"; \
+        echo "idna repaired: ${dir}"; \
+      done < /tmp/idna-broken.txt; \
+      rm -rf /tmp/idna-pkg; \
+    fi \
+ && rm -f /tmp/idna-broken.txt
 
 # 台灣 apt 鏡像
 RUN sed -i 's@archive.ubuntu.com@tw.archive.ubuntu.com@g' /etc/apt/sources.list || true
@@ -65,6 +45,8 @@ RUN sed -i 's@archive.ubuntu.com@tw.archive.ubuntu.com@g' /etc/apt/sources.list 
 # 時區
 RUN ln -snf /usr/share/zoneinfo/"${TZ}" /etc/localtime \
  && echo "${TZ}" > /etc/timezone
+
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 COPY --chmod=0755 ./${ENTRYPOINT_FILE} /entrypoint.sh
 COPY --chmod=0755 ./start_isaac.sh /usr/local/share/isaac-sim-tools/start_isaac.sh
@@ -120,12 +102,20 @@ RUN apt update \
  && rm -rf /var/lib/apt/lists/*
 
 ############################### ISAAC LAB #####################################
-# Isaac Lab v2.3.x 對應 Isaac Sim 5.1；安裝流程參考官方 docker/Dockerfile.base
+# Isaac Lab v3.0.0 對應 Isaac Sim 6.2。依賴裝進 Kit Python 上的 uv venv，
+# 與官方 docker/Dockerfile.base 相同，避免 pip_prebundle 的 torch 蓋掉 venv。
 SHELL ["/bin/bash", "-c"]
-ARG ISAAC_LAB_VERSION=v2.3.2
+ARG ISAAC_LAB_VERSION=v3.0.0
 ENV ISAACSIM_ROOT_PATH=/isaac-sim
 ENV ISAACLAB_PATH=/root/work/IsaacLab
 ENV TERM=xterm
+ENV VIRTUAL_ENV=/opt/isaaclab-venv
+ENV UV_PROJECT_ENVIRONMENT=/opt/isaaclab-venv
+ENV UV_PYTHON=/isaac-sim/kit/python/bin/python3
+ENV UV_PYTHON_PREFERENCE=only-system
+ENV UV_HTTP_RETRIES=12
+ENV MUJOCO_GL=disable
+ENV HUB__ARGS__DETECT_ONLY=false
 
 RUN apt update \
  && apt install -y --no-install-recommends \
@@ -137,49 +127,48 @@ RUN apt update \
 
 RUN git clone --depth 1 --branch "${ISAAC_LAB_VERSION}" \
     https://github.com/isaac-sim/IsaacLab.git "${ISAACLAB_PATH}" \
- && chmod +x "${ISAACLAB_PATH}/isaaclab.sh" \
- && ln -sf "${ISAACSIM_ROOT_PATH}" "${ISAACLAB_PATH}/_isaac_sim"
+ && find "${ISAACLAB_PATH}" -type f -name "*.sh" -exec sed -i 's/\r$//' {} + \
+ && chmod 755 "${ISAACLAB_PATH}/isaaclab.sh" \
+ && ln -sfn "${ISAACSIM_ROOT_PATH}" "${ISAACLAB_PATH}/_isaac_sim" \
+ && bash "${ISAACLAB_PATH}/docker/scripts/install_carb_env_shim.sh" "${ISAACSIM_ROOT_PATH}" \
+ && mkdir -p /var/cache/hub
 
-RUN "${ISAACSIM_ROOT_PATH}/python.sh" -m pip install toml
+RUN test -x "${UV_PYTHON}" \
+ && uv venv --seed "${VIRTUAL_ENV}"
 
-RUN "${ISAACSIM_ROOT_PATH}/python.sh" "${ISAACLAB_PATH}/tools/install_deps.py" apt "${ISAACLAB_PATH}/source" \
+# 第三方依賴先裝；workspace 套件稍後再裝，讓 install_deps.py 能從原始碼 import isaaclab。
+ARG ISAACLAB_EXTRAS="--extra rsl-rl"
+RUN cd "${ISAACLAB_PATH}" \
+ && uv sync --frozen --inexact ${ISAACLAB_EXTRAS} \
+      --no-install-workspace --no-install-package imageio-ffmpeg
+
+RUN "${ISAACLAB_PATH}/isaaclab.sh" -p "${ISAACLAB_PATH}/tools/install_deps.py" apt "${ISAACLAB_PATH}/source" \
  && apt -y autoremove \
  && apt clean \
  && rm -rf /var/lib/apt/lists/*
 
-# flatdict 在 pip build isolation 下會因缺少 pkg_resources 失敗，需先預裝
-RUN "${ISAACSIM_ROOT_PATH}/python.sh" -m pip install --no-build-isolation flatdict==4.0.1
+RUN cd "${ISAACLAB_PATH}" \
+ && uv sync --frozen --inexact ${ISAACLAB_EXTRAS} \
+      --no-install-package imageio-ffmpeg
 
-RUN TERM=xterm "${ISAACLAB_PATH}/isaaclab.sh" --install \
- && "${ISAACSIM_ROOT_PATH}/python.sh" -m pip uninstall -y quadprog
+# runheadless.sh 會先吃到 pip_prebundle 的 torch；改指向 venv，避免 CUDA/NCCL 符號不符。
+RUN "${ISAACLAB_PATH}/isaaclab.sh" -p -c \
+    "from isaaclab.cli.commands.install import _repoint_prebundle_packages; _repoint_prebundle_packages()"
 
-# HuggingFace CLI (for downloading motion CSVs from HF datasets)
-# Install into Isaac Lab's python env so it works with `./isaaclab.sh -p ...`
-RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U huggingface_hub
-RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U wandb
-RUN "${ISAACLAB_PATH}/_isaac_sim/python.sh" -m pip install --no-cache-dir -U tensorboard
+ENV UV_PYTHON=/opt/isaaclab-venv/bin/python
+
+# HuggingFace CLI / WandB / TensorBoard 裝進 venv，讓 isaaclab.sh -p 看得到。
+RUN uv pip install --no-cache-dir huggingface_hub wandb tensorboard
 RUN cat <<'EOF' > /usr/local/bin/huggingface-cli && chmod +x /usr/local/bin/huggingface-cli
 #!/usr/bin/env bash
 set -euo pipefail
-exec /root/work/IsaacLab/_isaac_sim/python.sh -m huggingface_hub.cli.hf "$@"
+exec /opt/isaaclab-venv/bin/python -m huggingface_hub.cli.hf "$@"
 EOF
 RUN cat <<'EOF' > /usr/local/bin/tensorboard && chmod +x /usr/local/bin/tensorboard
 #!/usr/bin/env bash
 set -euo pipefail
-exec /root/work/IsaacLab/_isaac_sim/python.sh -m tensorboard.main "$@"
+exec /opt/isaaclab-venv/bin/python -m tensorboard.main "$@"
 EOF
-
-# torch 2.7+cu128 expects CUDA 12 libs under site-packages/nvidia/{cublas,cuda_runtime,...}
-RUN ISAAC="${ISAACSIM_ROOT_PATH}" && \
-    SITE="${ISAAC}/kit/python/lib/python3.11/site-packages/nvidia" && \
-    ML="${ISAAC}/exts/omni.isaac.ml_archive/pip_prebundle/nvidia" && \
-    mkdir -p "${SITE}" && \
-    for pkg in "${ML}"/*; do \
-      name="$(basename "${pkg}")"; \
-      [ "${name}" = "__init__.py" ] && continue; \
-      [ -d "${pkg}" ] || continue; \
-      [ -e "${SITE}/${name}" ] || ln -sfn "${pkg}" "${SITE}/${name}"; \
-    done
 
 ############################## USER CONFIG ####################################
 WORKDIR /root
@@ -252,20 +241,22 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
-# --- Isaac Sim CUDA libs (torch 2.7.x after Isaac Lab install) ---
+# --- Isaac Sim / Lab runtime（6.2 的 carb shim 在 /etc/ld.so.preload）---
 if [[ -f /root/work/src/docker/isaac_cuda_env.sh ]]; then
   source /root/work/src/docker/isaac_cuda_env.sh
 fi
 
-# --- Isaac Lab ---
+# --- Isaac Lab 3.0：python / pip 走 venv，isaaclab.sh -p 才載得到 Kit ---
 export ISAACSIM_PATH=/isaac-sim
 export ISAACSIM_PYTHON_EXE=/isaac-sim/python.sh
 export ISAACLAB_PATH=/root/work/IsaacLab
+export VIRTUAL_ENV=/opt/isaaclab-venv
+export PATH="/opt/isaaclab-venv/bin:$PATH"
 alias isaaclab="\${ISAACLAB_PATH}/isaaclab.sh"
-alias python="\${ISAACLAB_PATH}/_isaac_sim/python.sh"
-alias python3="\${ISAACLAB_PATH}/_isaac_sim/python.sh"
-alias pip="\${ISAACLAB_PATH}/_isaac_sim/python.sh -m pip"
-alias pip3="\${ISAACLAB_PATH}/_isaac_sim/python.sh -m pip"
+alias python="\${ISAACLAB_PATH}/isaaclab.sh -p"
+alias python3="\${ISAACLAB_PATH}/isaaclab.sh -p"
+alias pip="uv pip"
+alias pip3="uv pip"
 EOF
 
 WORKDIR /root/work

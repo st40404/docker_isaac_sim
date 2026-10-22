@@ -24,8 +24,8 @@ elif [[ -f "${ISAAC_DIR}/setup_python_env.sh" ]]; then
 fi
 
 cd "${ISAAC_DIR}"
+# 6.2 使用映像預設的 RTX。5.1 在驅動 595 上強制 Storm 仍會載入 rtx.scenedb 並 segfault。
 if [[ -x ./runheadless.sh ]]; then
-  exec ./runheadless.sh --/renderer/active=Storm "$@"
+  exec ./runheadless.sh "$@"
 fi
-exec ./kit/kit ./apps/isaacsim.exp.full.streaming.kit --no-window \
-  --/renderer/active=Storm "$@"
+exec ./kit/kit ./apps/isaacsim.exp.full.streaming.kit --no-window "$@"
