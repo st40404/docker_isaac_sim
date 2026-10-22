@@ -270,4 +270,4 @@ EOF
 
 WORKDIR /root/work
 
-ENTRYPOINT [ "/entrypoint.sh", "terminator" ]
+ENTRYPOINT [ "/entrypoint.sh", "bash" ]

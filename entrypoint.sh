@@ -54,7 +54,7 @@ run_isaac() {
     --/renderer/active=Storm "$@"
 }
 
-case "${1:-terminator}" in
+case "${1:-bash}" in
   terminator)
     run_beyondmimic_setup
     if [[ -z "${DISPLAY:-}" ]]; then
